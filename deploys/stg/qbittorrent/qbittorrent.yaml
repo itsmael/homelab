@@ -1,0 +1,67 @@
+# 1. ACESSO WEB (SERVICE)
+apiVersion: v1
+kind: Service
+metadata:
+  name: qbittorrent-service
+  namespace: k3s-stg      # Namespace de Staging
+spec:
+  type: NodePort
+  selector:
+    app: qbittorrent
+  ports:
+    - name: webui
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080     # Porta externa no IP do ThinkCentre
+---
+# 2. APLICAÇÃO (DEPLOYMENT)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qbittorrent
+  namespace: k3s-stg      # Namespace de Staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qbittorrent
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: qbittorrent
+    spec:
+      containers:
+      - name: qbittorrent
+        image: lscr.io/linuxserver/qbittorrent:latest
+        env:
+          - name: PUID
+            value: "1000" # UID do seu usuário no Arch
+          - name: PGID
+            value: "1000"
+          - name: TZ
+            value: "America/Sao_Paulo"
+          - name: WEBUI_PORT
+            value: "8080"
+          - name: QBT_LEGAL_NOTICE
+            value: "confirm"  
+        ports:
+          - containerPort: 8080
+        volumeMounts:
+          - mountPath: /config
+            name: qbit-config
+          # Mapeia a raiz da mídia (/mnt/appa/media) para o container
+          - mountPath: /downloads
+            name: media-storage
+      volumes:
+      - name: qbit-config
+        hostPath:
+          path: /mnt/appa/qbittorrent/config
+          type: DirectoryOrCreate
+      # Onde estão as pastas 'movies' e 'series' no seu servidor yggdrasil
+      - name: media-storage
+        hostPath:
+          path: /mnt/appa/media
+          type: Directory

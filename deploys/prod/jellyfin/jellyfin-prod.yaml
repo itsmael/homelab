@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-jellyfin-media
+  namespace: k3s-prod
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: pv-yggdrasil-ssd
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyfin-deployment
+  namespace: k3s-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jellyfin
+  template:
+    metadata:
+      labels:
+        app: jellyfin
+    spec:
+      containers:
+      - name: jellyfin
+        image: jellyfin/jellyfin:latest
+        ports:
+        - containerPort: 8096
+        volumeMounts:
+        - mountPath: /config
+          name: jellyfin-config
+        - mountPath: /data/movies
+          name: movies-volume
+        - mountPath: /data/series
+          name: series-volume
+      volumes:
+      - name: jellyfin-config
+        persistentVolumeClaim:
+          claimName: pvc-jellyfin-media
+      - name: movies-volume
+        hostPath:
+          path: /mnt/appa/media/movies
+          type: Directory
+      - name: series-volume
+        hostPath:
+          path: /mnt/appa/media/series
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyfin-service
+  namespace: k3s-prod
+spec:
+  selector:
+    app: jellyfin
+  ports:
+    - protocol: TCP
+      port: 8096
+      targetPort: 8096
+      nodePort: 30096 
+  type: NodePort
